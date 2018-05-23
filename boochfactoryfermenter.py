@@ -33,10 +33,20 @@ try:
     
     #set heater realy pin number
     heaterRelayPin = 15
-
+    #I would prefer a realy that was default off on configuring as OUTPUT, but that is a future upgrade.....
+    GPIO.setup(heaterRelayPin, GPIO.OUT)
+    
     #setup the output log file
     #Open boochlog.txt in the home directory inappend mode. If it does not exist, create it.
     log = open("/home/pi/boochlog.txt", "a+")
+    
+    #setup the heater state perisistant value file
+    #using a file instead of pickle or shelve because easier to read outside of program
+    heaterStatePersist = open("/home/pi/heaterStatePersist.txt", "a")
+    heaterStatePersist.close()
+
+    with open("/home/pi/heaterStatePersist.txt", "r") as heaterStatePersist:
+        previousHeaterState = heaterStatePersist.read()
 
 
     ##############################################
@@ -88,13 +98,18 @@ try:
     def heatingLEDoff():
         GPIO.output(heatingLEDpin,False)
         
-    #functions to control the heater state via the relay and handle errors in temp sensing    
+    #functions to control the heater state via the relay and handle errors in temp sensing
+        #I would prefer a realy that was default off on configuring as OUTPUT, but that is a future upgrade.....
     def setHeaterState(state):
         if state == "ON":
-            #whatever pinstate turns the relay on :::: GPIO.output(heaterRelayPin, True)
+            GPIO.output(heaterRelayPin, False) #False turns the relay on
+            with open("/home/pi/heaterStatePersist.txt", "w") as heaterStatePersist:
+                heaterStatePersist.write('ON')
             heatingLEDon()
         elif state == "OFF":
-            #whatever pinstate turns the relay OFF :::: GPIO.output(heaterRelayPin, False)
+            GPIO.output(heaterRelayPin, True) #False turns the relay off
+            with open("/home/pi/heaterStatePersist.txt", "w") as heaterStatePersist:
+                heaterStatePersist.write('OFF')
             heatingLEDoff()
         else:
             print("Invalid heater state. Aborting.")
@@ -109,7 +124,7 @@ try:
             log.write('Temp abnormally low! Abort!')
             GPIO.cleanup()
             sys.exit()
-        if tempReading >= 85:
+        if tempReading >= 95:
             log.write('Temp abnormally high! Abort!')
             GPIO.cleanup()
             sys.exit()
@@ -122,7 +137,7 @@ try:
     #############
     # MAIN LOOP #
     #############
-    for i in range(10):
+    for i in range(1):
         statusLEDon()
         
         #create timestamp
@@ -137,14 +152,17 @@ try:
         #error check the temp - abort if crazy reading
         crazyCheckResult = crazyCheckTemp(currentTemp)
         
-
+        #get current state of heater (to let it coast down to the min temp if below min and max temps
+        print(str(previousHeaterState))
         
+        
+        newHeaterState=str(previousHeaterState)
         if currentTemp <= minTemp:
-            heaterState = "ON"
+            newHeaterState = "ON"
         elif currentTemp >= maxTemp:
-            heaterState = "OFF"
+            newHeaterState = "OFF"
                   
-        setHeaterState(heaterState)
+        setHeaterState(newHeaterState)
     
         #assemble the message to log
         message = host + ', ' + timestamp + ', ' + str(currentTemp) + ' ' + crazyCheckResult + '\n'
@@ -156,15 +174,15 @@ try:
         time.sleep(.3)        
 
 
-except KeyboardInterrupt:
-    print('Program haulted by keyboard input. Aborting!')
-    GPIO.cleanup()
-    sys.exit()
+#except KeyboardInterrupt:
+#    print('Program haulted by keyboard input. Aborting!')
+#    GPIO.cleanup() #this will turn the relay off
+#    sys.exit()
     
-except:
-    print('Unexpected error. Aborting.')
-    GPIO.cleanup()
-    sys.exit()
+#except:
+#    print('Unexpected error. Aborting.')
+#    GPIO.cleanup() #this will turnthe relay off
+#    sys.exit()
 
 
 #finally is always executed even if there is an error in the try block
@@ -176,11 +194,3 @@ finally:
     GPIO.cleanup(statusLEDpin)
     #show completion in terminal
     print('End')
-
-
-
-
-
-
-
-
