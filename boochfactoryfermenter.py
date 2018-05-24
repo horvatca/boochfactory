@@ -98,8 +98,8 @@ try:
     def heatingLEDoff():
         GPIO.output(heatingLEDpin,False)
         
-    #functions to control the heater state via the relay and handle errors in temp sensing
-        #I would prefer a realy that was default off on configuring as OUTPUT, but that is a future upgrade.....
+    #functions to control the heater state and persist the state for reading by future executions
+        #I would prefer a relsy that was default off on configuring as OUTPUT, but that is a future upgrade wih different hardware.....
     def setHeaterState(state):
         if state == "ON":
             GPIO.output(heaterRelayPin, False) #False turns the relay on
@@ -113,25 +113,24 @@ try:
             heatingLEDoff()
         else:
             print("Invalid heater state. Aborting.")
+            log.write("Invalid heater state. Aborting.")
             GPIO.cleanup()
-            
+    
+    #sanity check on temperature readings that will detect prolems with the thermometer
     def crazyCheckTemp(tempReading):
         if tempReading <= 35 and tempReading >= 29:
-            log.write('Thermometer disconnected! Abort!')
-            GPIO.cleanup()
-            sys.exit()
+            return 'Thermometer disconnected! Abort!'
         if tempReading <= 60:
-            log.write('Temp abnormally low! Abort!')
-            GPIO.cleanup()
-            sys.exit()
+            return 'Temp abnormally low! Abort!'
         if tempReading >= 95:
-            log.write('Temp abnormally high! Abort!')
-            GPIO.cleanup()
-            sys.exit()
+            return 'Temp abnormally high! Abort!'
         else:
             return "CrazyPass"
     
-
+    #grab the CPU temp for monitoring because we will put the Raspberry Pi in an enclosure and it may overheat
+    def getCPUtemperature():
+        res = os.popen('vcgencmd measure_temp').readline()
+        return(res.replace("temp=","").replace("'C\n",""))
             
 
     #############
@@ -147,14 +146,17 @@ try:
         #get host
         host = str(socket.gethostname())
         
+        #get CPU temp
+        cpuTemp = getCPUtemperature()
+                                               
         #get temp
         currentTemp = degCtoF(read_temp()) + thermAdjust
-        #error check the temp - abort if crazy reading
-        crazyCheckResult = crazyCheckTemp(currentTemp)
         
         #get current state of heater (to let it coast down to the min temp if below min and max temps
-        print(str(previousHeaterState))
+        print(str(previousHeaterState))        
         
+        #error check the temp - abort if crazy reading
+        crazyCheckResult = crazyCheckTemp(currentTemp)
         
         newHeaterState=str(previousHeaterState)
         if currentTemp <= minTemp:
@@ -165,13 +167,21 @@ try:
         setHeaterState(newHeaterState)
     
         #assemble the message to log
-        message = host + ', ' + timestamp + ', ' + str(currentTemp) + ' ' + crazyCheckResult + '\n'
+        message = host + ', ' + timestamp + ', ' + str(currentTemp) + ', ' + crazyCheckResult + ', HeaterStatus: ' + newHeaterState + ', CPU Temp: ' + cpuTemp + '\n'
         
         print(message)
         log.write(message)
         
+        if crazyCheckResult != 'CrazyPass':
+            GPIO.cleanup()
+            sys.exit()
+        
+        #these line represent a sucessful completion of the main loop
+        #after they are executed, the FINALLY will be executed.
+        #really the only function is to pause long enough for the status LED to be visible
+        time.sleep(.3)  
         statusLEDoff()
-        time.sleep(.3)        
+      
 
 
 #except KeyboardInterrupt:
