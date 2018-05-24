@@ -184,15 +184,15 @@ try:
       
 
 
-#except KeyboardInterrupt:
-#    print('Program haulted by keyboard input. Aborting!')
-#    GPIO.cleanup() #this will turn the relay off
-#    sys.exit()
+except KeyboardInterrupt:
+    log.write('Program haulted by keyboard input. Aborting!')
+    GPIO.cleanup() #this will turn the relay off
+    sys.exit()
     
-#except:
-#    print('Unexpected error. Aborting.')
-#    GPIO.cleanup() #this will turnthe relay off
-#    sys.exit()
+except:
+    log.write('Unexpected error. Aborting.')
+    GPIO.cleanup() #this will turnthe relay off
+    sys.exit()
 
 
 #finally is always executed even if there is an error in the try block
