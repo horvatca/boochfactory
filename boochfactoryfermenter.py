@@ -28,8 +28,8 @@ try:
     
     #set minimum and max booch temp in deg F
     #heater turns on a min temp and off at max temp
-    minTemp = 86
-    maxTemp = 88
+    minTemp = 79
+    maxTemp = 80
     
     #set heater realy pin number
     heaterRelayPin = 15
